@@ -6,15 +6,14 @@ Created on Thu Jul 29 11:25:34 2021
 Reconstructed by wHy 2023.01.01
 """
 
-import os,sys
+import sys
 from osgeo import gdal
 from osgeo import osr
 import numpy as np
-from osgeo import ogr
-import linecache
 from skimage import io
 import csv
-import math
+from tqdm import tqdm
+
 
 def getSRSPair(dataset):
     '''
@@ -26,6 +25,7 @@ def getSRSPair(dataset):
     prosrs.ImportFromWkt(dataset.GetProjection())
     geosrs = prosrs.CloneGeogCS()
     return prosrs, geosrs
+
 
 def lonlat2geo(dataset, lon, lat):
     '''
@@ -40,6 +40,7 @@ def lonlat2geo(dataset, lon, lat):
     coords = ct.TransformPoint(lon, lat)
     return coords[:2]
 
+
 def imagexy2geo(dataset, row, col):
     '''
     根据GDAL的六参数模型将影像图上坐标（行列号）转为投影坐标或地理坐标（根据具体数据的坐标系统转换）
@@ -52,6 +53,7 @@ def imagexy2geo(dataset, row, col):
     px = trans[0] + col * trans[1] + row * trans[2]
     py = trans[3] + col * trans[4] + row * trans[5]
     return px, py
+
 
 def geo2imagexy(dataset, x, y):
     '''
@@ -66,47 +68,45 @@ def geo2imagexy(dataset, x, y):
     b = np.array([x - trans[0], y - trans[3]])
     return np.linalg.solve(a, b)  # 使用numpy的linalg.solve进行二元一次方程的求解
 
+
 def readTif(fileName):
     dataset = gdal.Open(fileName)
     if dataset == None:
-        print(fileName+"文件无法打开")
+        print(fileName + "文件无法打开")
         return
-    im_width = dataset.RasterXSize # 栅格矩阵的列数
-    im_height = dataset.RasterYSize # 栅格矩阵的行数
-    im_bands = dataset.RasterCount # 波段数
-    im_data = dataset.ReadAsArray(0,0,im_width,im_height) # 获取数据
-    
+    im_width = dataset.RasterXSize  # 栅格矩阵的列数
+    im_height = dataset.RasterYSize  # 栅格矩阵的行数
+    im_bands = dataset.RasterCount  # 波段数
+    im_data = dataset.ReadAsArray(0, 0, im_width, im_height)  # 获取数据
 
 
 if __name__ == '__main__':
 
-    img_path = r'E:\yanxin\data/岩心高光谱图像_Export.tif' # 影像路径
-    save_path = r'E:\yanxin\data/sr_img.csv' # 输出路径
-    
+    img_path = r'E:\yanxin\data/岩心高光谱图像_Export.tif'  # 影像路径
+    save_path = r'E:\yanxin\data/sr_img.csv'  # 输出路径
+
+    if len(sys.argv) > 2:
+        img_path = sys.argv[1]
+        save_path = sys.argv[2]
+
     img = io.imread(img_path)
     #img = img.transpose(1, 2, 0)
     height = img.shape[0]
     width = img.shape[1]
     channel = img.shape[2]
 
-    print(height, width, channel)
-
-    middle = np.zeros([height*width, channel])
-    for i in range(0, height):
+    print('图像高, 宽, 波段数：', height, width, channel)
+    print('-----------------------------------------------------')
+    middle = np.zeros([height * width, channel])
+    print("图像转表格...")
+    for i in tqdm(range(0, height)):
         for j in range(0, width):
             for k in range(0, channel):
-                middle[i*width + j][k] = img[i][j][k]
-
+                middle[i * width + j][k] = img[i][j][k]
+    print("图像转表格完毕")
+    print('-----------------------------------------------------')
+    print("写入数据...")
     with open(save_path, "w", newline='') as csvfile:
         writer = csv.writer(csvfile)
         writer.writerows(middle)
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    print("数据写入完毕")
